@@ -95,8 +95,8 @@ def decode(boc: bytes) -> list[Cell]:
     has_crc32c = flags >> 6 & 1
     has_cache_bits = flags >> 5 & 1
 
-    if has_index or has_cache_bits:
-        raise NotImplementedError
+    if has_cache_bits and not has_index:
+        raise ValueError("Cache flag can't be set without index flag")
     
     if has_crc32c:
         crc = crc32c(boc[:-4])
@@ -114,7 +114,10 @@ def decode(boc: bytes) -> list[Cell]:
     for i in range(roots_len):
         root_index = parser.load_uint(cell_size_bytes)
         roots_indexes.append(root_index)
-    payload = parser.load_bytes(payload_size)
+    if has_index:
+        for i in range(cells_len):
+            l = parser.load_uint(size_bytes)
+    payload = parser.load_bytes(payload_size)    
     if has_crc32c:
         parser.skip_bytes(4)
     parser.end_parse()

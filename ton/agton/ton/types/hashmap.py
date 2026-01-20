@@ -37,10 +37,10 @@ class Hashmap:
     node: Leaf | Fork
 
     def to_dict(self) -> dict[BitString, Slice]:
-        d = dict()
+        d: dict[BitString, Slice] = dict()
         match self.node:
             case Leaf(s):
-                d[self.label] = s
+                d[self.label] = s.begin_parse()
                 return d
             case Fork(l, r):
                 left = l.to_dict()
@@ -69,7 +69,7 @@ class Hashmap:
         keys = list(d.keys())
         if len(keys) == 1:
             key = keys[0]
-            return Hashmap(key, Leaf(d[key]))
+            return Hashmap(key, Leaf(d[key].to_cell()))
         k = lcp(keys)
         label = keys[0][:k]
 
@@ -94,7 +94,7 @@ HashmapE = Hashmap | None
 
 @dataclass
 class Leaf:
-    value: Slice
+    value: Cell
 
 @dataclass
 class Fork:
@@ -160,7 +160,8 @@ def hml_long_size(l: BitString, m: int) -> int:
     return 2 + m.bit_length() + len(l)
 
 def is_bits_same(l: BitString) -> tuple[bool, int]:
-    assert len(l) > 0
+    if len(l) == 0:
+        return False, -1
     for b in l:
         if b != l[0]:
             return False, -1
@@ -196,7 +197,7 @@ def store_label(b: Builder, l: BitString, m: int) -> int:
 
 def load_node(s: Slice, n: int) -> Leaf | Fork:
     if n == 0:
-        return Leaf(s)
+        return Leaf(s.to_cell())
     left = load_hashmap(s.load_ref().begin_parse(), n - 1)
     right = load_hashmap(s.load_ref().begin_parse(), n - 1)
     return Fork(left, right)
@@ -204,10 +205,10 @@ def load_node(s: Slice, n: int) -> Leaf | Fork:
 def store_node(b: Builder, node: Leaf | Fork, n: int) -> None:
     match node:
         case Leaf(v):
-            b.store_slice(v)
+            b.store_slice(v.to_slice())
         case Fork(l, r):
-            store_hashmap(b, l, n - 1)
-            store_hashmap(b, r, n - 1)
+            b.store_ref(store_hashmap(begin_cell(), l, n - 1).end_cell())
+            b.store_ref(store_hashmap(begin_cell(), r, n - 1).end_cell())
 
 def load_hashmap(s: Slice, n: int) -> Hashmap:
     label, l = load_label(s, n)
