@@ -9,15 +9,25 @@ from ..types import MsgAddressInt, Address, StateInit, MessageRelaxed, Message, 
 from ..types import MsgAddressExt, AddrNone
 from ..types.tvm_value import TvmValue
 
+class ContractError(Exception):
+    pass
+
 class Contract:
-    def __init__(self, provider: Provider, address: MsgAddressInt) -> None:
-        self.provider = provider
+    def __init__(self, address: MsgAddressInt, provider: Provider | None = None) -> None:
         self.address = address
+        self.provider = provider
     
     def run_get_method(self,
                        method_id: int | str,
                        stack: Iterable[TvmValue] | TvmValue | None = None) -> tuple[TvmValue, ...] | TvmValue:
+        if self.provider is None:
+            raise ContractError('Cannot run get method without provider set')
         return self.provider.run_get_method(self.address, method_id, stack)
+    
+    def send_external_message(self, msg: Message) -> bytes:
+        if self.provider is None:
+            raise ContractError('Cannot send external message without provider set')
+        return self.provider.send_external_message(msg)
     
     def create_internal_message(self, *,
                                 value: int | CurrencyCollection = 0,

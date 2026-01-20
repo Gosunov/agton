@@ -6,7 +6,7 @@ from typing import Iterable
 
 from agton.ton import Contract, Cell, Message, MessageRelaxed, begin_cell, Provider, TlbConstructor
 from agton.ton import Builder
-from agton.ton import Slice
+from agton.ton import Slice, Address
 from agton.ton.crypto.signing import private_key_to_public_key
 
 from agton.wallet.mnemonic import mnemonic_to_private_key, new_mnemonic
@@ -50,19 +50,15 @@ class WalletV3R2Data(TlbConstructor):
 
 class WalletV3R2(Contract):
     def __init__(self,
-                 provider: Provider,
+                 address: Address,
                  private_key: bytes,
                  subwallet: int | None = None,
-                 wc: int = 0) -> None:
+                 provider: Provider | None = None) -> None:
         if subwallet is None:
-            subwallet = WALLET_V3R2_SUBWALLET_MAGIC + wc
+            subwallet = WALLET_V3R2_SUBWALLET_MAGIC + address.workchain
         self.subwallet = subwallet
         self.private_key = private_key
-
-        public_key = private_key_to_public_key(self.private_key)
-        initial_data = WalletV3R2Data.initial(public_key, self.subwallet).to_cell()
-        address = WalletV3R2.code_and_data_to_address(WALLET_V3R2_CODE, initial_data)
-        super().__init__(provider, address)
+        super().__init__(address, provider)
 
     MessageWithMode = tuple[MessageRelaxed, int]
 
@@ -114,7 +110,7 @@ class WalletV3R2(Contract):
             t = datetime.now() + timedelta(minutes=3)
             valid_until = int(t.timestamp())
         signed_message = self.create_signed_external([(m, mode)], valid_until, self.seqno())
-        return self.provider.send_external_message(signed_message)
+        return self.send_external_message(signed_message)
     
     def send_many(self,
                   messages_with_modes: Iterable[MessageWithMode],
@@ -129,35 +125,40 @@ class WalletV3R2(Contract):
             t = datetime.now() + timedelta(minutes=3)
             valid_until = int(t.timestamp())
         signed_message = self.create_signed_external(messages_with_modes, valid_until, self.seqno())
-        return self.provider.send_external_message(signed_message)
-    
+        return self.send_external_message(signed_message)
+
     def seqno(self) -> int:
         s = self.run_get_method('seqno')
         match s:
             case int(): return s
             case _: raise TypeError(f'Unexpected result for seqno: {s!r}')
-    
+
     @classmethod
     def from_private_key(cls,
-                         provider: Provider,
                          private_key: bytes,
                          subwallet: int | None = None,
-                         wc: int = 0) -> WalletV3R2:
-        return cls(provider, private_key, subwallet, wc)
+                         wc: int = 0,
+                         provider: Provider | None = None) -> WalletV3R2:
+        if subwallet is None:
+            subwallet = WALLET_V3R2_SUBWALLET_MAGIC + wc
+        public_key = private_key_to_public_key(private_key)
+        data = WalletV3R2Data.initial(public_key, subwallet)
+        address = cls.code_and_data_to_address(WALLET_V3R2_CODE, data.to_cell(), wc)
+        return cls(address, private_key, subwallet, provider)
 
     @classmethod
     def from_mnemonic(cls,
-                      provider: Provider,
                       mnemonic: str,
                       subwallet: int | None = None,
-                      wc: int = 0) -> WalletV3R2:
+                      wc: int = 0,
+                      provider: Provider | None = None) -> WalletV3R2:
         private_key = mnemonic_to_private_key(mnemonic)
-        return cls.from_private_key(provider, private_key, subwallet, wc)
+        return cls.from_private_key(private_key, subwallet, wc, provider)
 
     @classmethod
     def create(cls,
-               provider: Provider,
                subwallet: int | None = None,
-               wc: int = 0) -> tuple[WalletV3R2, str]:
+               wc: int = 0,
+               provider: Provider | None = None) -> tuple[WalletV3R2, str]:
         mnemonic = new_mnemonic()
-        return cls.from_mnemonic(provider, mnemonic, subwallet, wc), mnemonic
+        return cls.from_mnemonic(mnemonic, subwallet, wc, provider), mnemonic
