@@ -294,8 +294,19 @@ class HashmapCodec[K, V]:
             return s.load_coins()
         return HashmapCodec(self.k_de, self.k_se, v_de, v_se, self.value_in_ref)
     
-    def with_snake_data_values(self) -> HashmapCodec[K, str]:
-        raise NotImplementedError
+    def with_snake_string_values(self) -> HashmapCodec[K, str]:
+        def v_se(v: str) -> Slice:
+            return begin_cell().store_snake_string(v).to_slice()
+        def v_de(s: Slice) -> str:
+            return s.load_snake_string()
+        return HashmapCodec(self.k_de, self.k_se, v_de, v_se, self.value_in_ref)
+    
+    def with_snake_bytes_values(self) -> HashmapCodec[K, bytes]:
+        def v_se(v: bytes) -> Slice:
+            return begin_cell().store_snake_bytes(v).to_slice()
+        def v_de(s: Slice) -> bytes:
+            return s.load_snake_bytes()
+        return HashmapCodec(self.k_de, self.k_se, v_de, v_se, self.value_in_ref)
     
     def with_tlb_values[T: TlbConstructor](self, deserializer: type[T] | Callable[[Slice], T]) -> HashmapCodec[K, T]:
         def v_se(v: T) -> Slice:
