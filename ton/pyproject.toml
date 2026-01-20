@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agton"
-version = "0.2.3"
+version = "0.2.4"
 description = "TON Blockchain SDK"
 readme = "README.md"
 requires-python = ">=3.12"
@@ -19,13 +19,13 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-wallet = ["agton-wallet>=0.2.3"]
-jetton = ["agton-jetton>=0.2.3"]
-dedust = ["agton-dedust>=0.2.3"]
+wallet = ["agton-wallet>=0.2.4"]
+jetton = ["agton-jetton>=0.2.4"]
+dedust = ["agton-dedust>=0.2.4"]
 all = [
-  "agton-wallet>=0.2.3",
-  "agton-jetton>=0.2.3",
-  "agton-dedust>=0.2.3",
+  "agton-wallet>=0.2.4",
+  "agton-jetton>=0.2.4",
+  "agton-dedust>=0.2.4",
 ]
 
 [tool.setuptools.packages.find]

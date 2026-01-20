@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "agton-wallet"
-version = "0.2.3"
+version = "0.2.4"
 description = "TON Blockchain wrappers for wallets contracts"
 readme = "README.md"
 requires-python = ">=3.12"
 license = { text = "MIT" }
 authors = [{ name = "Alexey Gosunov", email = "agosunov@gmail.com" }]
-dependencies = ["agton>=0.2.3"]
+dependencies = ["agton>=0.2.4"]
 
 [project.urls]
 Homepage = "https://github.com/gosunov/agton"
