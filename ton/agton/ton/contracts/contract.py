@@ -5,7 +5,7 @@ from typing import Self, Iterable
 from ..cell.cell import Cell
 
 from ..provider import Provider
-from ..types import MsgAddressInt, Address, StateInit, MessageRelaxed, Message, CurrencyCollection
+from ..types import Address, StateInit, MessageRelaxed, Message, CurrencyCollection
 from ..types import MsgAddressExt, AddrNone
 from ..types.tvm_value import TvmValue
 
@@ -13,7 +13,7 @@ class ContractError(Exception):
     pass
 
 class Contract:
-    def __init__(self, address: MsgAddressInt, provider: Provider | None = None) -> None:
+    def __init__(self, address: Address, provider: Provider | None = None) -> None:
         self.address = address
         self.provider = provider
     
