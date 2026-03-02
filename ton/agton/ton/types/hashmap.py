@@ -6,7 +6,7 @@ from ..common import BitString, int2bs, bs2int
 
 from ..cell import Slice
 from ..cell import Builder, begin_cell
-from ..cell import Cell, OrdinaryCell
+from ..cell import Cell, OrdinaryCell, MerkleProofCell
 
 from .msg_address import MsgAddress, Address, msg_address
 
@@ -222,6 +222,28 @@ def store_hashmap(b: Builder, h: Hashmap, n: int) -> Builder:
     store_node(b, h.node, m)
     return b
 
+def store_pruned_node(b: Builder, node: Leaf | Fork, n: int, pl: int, k: BitString) -> None:
+    match node:
+        case Leaf(v):
+            assert len(k) == 0
+            b.store_slice(v.to_slice())
+        case Fork(l, r):
+            kn = BitString(k[pl + 1:])
+            if k[0] == 0:
+                b.store_ref(store_pruned_hashmap(begin_cell(), l, n - 1, kn).end_cell())
+                b.store_ref(store_hashmap(begin_cell(), r, n - 1).end_cell().prune())
+            else:
+                b.store_ref(store_hashmap(begin_cell(), l, n - 1).end_cell().prune())
+                b.store_ref(store_pruned_hashmap(begin_cell(), r, n - 1, kn).end_cell())
+
+def store_pruned_hashmap(b: Builder, h: Hashmap, n: int, k: BitString) -> Builder:
+    l = store_label(b, h.label, n)
+    if h.label != BitString(k[:l]):
+        raise ValueError('Key not in hashmap')
+    m = n - l
+    store_pruned_node(b, h.node, m, l, k)
+    return b
+
 @dataclass(frozen=True, slots=True)
 class HashmapCodec[K, V]:
     k_de: Callable[[BitString], K] | None = None
@@ -232,9 +254,9 @@ class HashmapCodec[K, V]:
 
     def decode(self, hashmap: HashmapE) -> dict[K, V]:
         if self.k_de is None:
-            raise ValueError('Key deserializator is not set')
+            raise ValueError('Key deserializer is not set')
         if self.v_de is None:
-            raise ValueError('Value deserializator is not set')
+            raise ValueError('Value deserializer is not set')
         def v_de(s: Slice, f: Callable[[Slice], V]) -> V:
             if self.value_in_ref:
                 s = s.load_ref().begin_parse()
@@ -247,7 +269,7 @@ class HashmapCodec[K, V]:
         if not d:
             return None
         if self.k_se is None or self.v_se is None:
-            raise ValueError('Serializators are not set')
+            raise ValueError('Serializers are not set')
         def v_se(v: V, f: Callable[[V], Slice]) -> Slice:
             s = f(v)
             if not self.value_in_ref:
@@ -259,6 +281,21 @@ class HashmapCodec[K, V]:
         hashmap = Hashmap.from_dict(cd)
         return hashmap
     
+    def prove_key_value_existance(self, hashmap: HashmapE, key: K, n: int) -> MerkleProofCell:
+        if self.k_se is None:
+            raise ValueError("Key serializer is not set")
+        if hashmap is None:
+            raise ValueError(f"Hashmap is empty")
+        pruned = store_pruned_hashmap(begin_cell(), hashmap, n, self.k_se(key)).end_cell()
+        return pruned.prove()
+    
+    def with_slice_values(self) -> HashmapCodec[K, Slice]:
+        def v_se(v: Slice) -> Slice:
+            return v
+        def v_de(s: Slice) -> Slice:
+            return s
+        return HashmapCodec(self.k_de, self.k_se, v_de, v_se, self.value_in_ref)
+
     def with_bool_values(self) -> HashmapCodec[K, bool]:
         def v_se(v: bool) -> Slice:
             return begin_cell().store_bool(v).to_slice()
@@ -357,6 +394,14 @@ class HashmapCodec[K, V]:
             return begin_cell().store_address(a).to_cell().data
         def k_de(b: BitString) -> Address:
             return OrdinaryCell(b).begin_parse().load_address()
+        return HashmapCodec(k_de, k_se, self.v_de, self.v_se, self.value_in_ref)
+    
+    def with_tlb_keys[T: TlbConstructor](self, deserializer: type[T] | Callable[[Slice], T]) -> HashmapCodec[T, V]:
+        ''' Sketchy '''
+        def k_se(v: T) -> BitString:
+            return begin_cell().store_tlb(v).to_cell().data
+        def k_de(b: BitString) -> T:
+            return OrdinaryCell(b).begin_parse().load_tlb(deserializer)
         return HashmapCodec(k_de, k_se, self.v_de, self.v_se, self.value_in_ref)
 
     def with_inline_values(self) -> HashmapCodec[K, V]:
