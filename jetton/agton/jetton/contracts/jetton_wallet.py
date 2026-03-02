@@ -1,13 +1,13 @@
 from dataclasses import dataclass
 
-from agton.ton import Contract, MsgAddress, Cell, Slice, MessageRelaxed, CurrencyCollection, to_nano
+from agton.ton import Contract, MsgAddress, Address, Cell, Slice, MessageRelaxed, CurrencyCollection, to_nano
 from agton.jetton.messages import JettonTransfer, JettonBurn
 
 @dataclass(frozen=True, slots=True)
 class JettonWalletData:
     balance: int
-    owner: MsgAddress
-    jetton: MsgAddress
+    owner: Address
+    jetton: Address
     jetton_wallet_code: Cell
 
 class JettonWallet(Contract):
@@ -22,8 +22,20 @@ class JettonWallet(Contract):
             ):
                 return JettonWalletData(
                     balance,
-                    owner.load_msg_address(),
-                    jetton.load_msg_address(),
+                    owner.load_address(),
+                    jetton.load_address(),
+                    jetton_wallet_code
+                )
+            case (
+                int() as balance,
+                Cell() as owner,
+                Cell() as jetton,
+                Cell() as jetton_wallet_code
+            ):
+                return JettonWalletData(
+                    balance,
+                    owner.begin_parse().load_address(),
+                    jetton.begin_parse().load_address(),
                     jetton_wallet_code
                 )
             case _:

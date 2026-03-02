@@ -1,6 +1,6 @@
 from dataclasses import dataclass
 
-from agton.ton import Contract, MsgAddress, MsgAddressInt, Cell, Slice, MessageRelaxed, CurrencyCollection
+from agton.ton import Contract, MsgAddress, Address, Cell, Slice, MessageRelaxed, CurrencyCollection
 from agton.jetton.messages import JettonTransfer
 
 from .jetton_wallet import JettonWallet
@@ -9,7 +9,7 @@ from .jetton_wallet import JettonWallet
 class JettonMasterData:
     total_supply: int 
     mintable: int 
-    admin_address: MsgAddressInt
+    admin_address: Address
     jetton_content: Cell
     jetton_wallet_code: Cell
 
@@ -27,25 +27,25 @@ class JettonMaster(Contract):
                 return JettonMasterData(
                     total_supply,
                     bool(mintable),
-                    admin_address.load_msg_address_int(),
+                    admin_address.load_address(),
                     jetton_content,
                     jetton_wallet_code
                 )
             case _:
                 raise TypeError(f"Unexpected result for get_jetton_data: {s!r}")
     
-    def get_wallet_address(self, owner: MsgAddressInt) -> MsgAddressInt:
+    def get_wallet_address(self, owner: Address) -> Address:
         s = self.run_get_method('get_wallet_address', owner.to_slice())
         match s:
             case Slice():
-                return s.load_msg_address_int()
+                return s.load_address()
             case Cell():
-                return s.begin_parse().load_msg_address_int()
+                return s.begin_parse().load_address()
             case _:
                 raise TypeError(f"Unexpected result for get_wallet_address: {s!r}")
     
-    def get_jetton_wallet(self, owner: MsgAddressInt) -> JettonWallet:
-        return JettonWallet(self.provider, self.get_wallet_address(owner))
+    def get_jetton_wallet(self, owner: Address) -> JettonWallet:
+        return JettonWallet(self.get_wallet_address(owner), self.provider)
 
     def create_jetton_transfer(self, *,
                                 query_id: int,
