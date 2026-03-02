@@ -13,8 +13,8 @@ class ActionSendMsg(TlbConstructor):
     action_send_msg#0ec3c86d mode:(## 8) 
         out_msg:^(MessageRelaxed Any) = OutAction;
     '''
-    mode: int
     out_msg: MessageRelaxed
+    mode: int
 
     @classmethod
     def tag(cls) -> tuple[int, int]:
@@ -24,7 +24,7 @@ class ActionSendMsg(TlbConstructor):
     def deserialize_fields(cls, s: Slice) -> Self:
         mode = s.load_uint(8)
         out_msg = s.load_ref_tlb(MessageRelaxed)
-        return cls(mode, out_msg)
+        return cls(out_msg, mode)
 
     def serialize_fields(self, b: Builder) -> Builder:
         b.store_uint(self.mode, 8)
