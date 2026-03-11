@@ -101,7 +101,7 @@ class ExtOutInfoRelaxed(TlbConstructor):
 CommonMsgInfoRelaxed = IntMsgInfoRelaxed | ExtOutInfoRelaxed
 
 def common_msg_relaxed(s: Slice) -> CommonMsgInfoRelaxed:
-    tag = s.preload_bits(2)
+    tag = s.preload_uint(2)
     match tag:
         case 0b00 | 0b01: return IntMsgInfoRelaxed.deserialize(s)
         case 0b11: return ExtOutInfoRelaxed.deserialize(s)
