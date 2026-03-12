@@ -3,7 +3,7 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Iterable
 
-from agton.ton import Cell
+from agton.ton import Cell, Network
 from agton.ton.types.tvm_value import TvmValue
 from agton.ton.crypto import crc16
 from agton.ton import MsgAddressInt, Message
@@ -14,6 +14,9 @@ class ProviderError(Exception):
 
 
 class Provider(ABC):
+    def __init__(self, network: Network):
+        self.network = network
+
     @abstractmethod
     def raw_run_get_method(
         self, 

@@ -1,6 +1,8 @@
 from enum import Enum
 
 class Network(Enum):
-    mainnet = 'mainnet'
-    testnet = 'testnet'
-    other = 'other'
+    mainnet = -239
+    testnet = -3
+    
+    def chain_id(self):
+        return self.value

@@ -49,12 +49,17 @@ def decode_tvm_value(d: dict[str, str]) -> TvmValue:
 
 class ToncenterClient(Provider, BaseApiClient):
     def __init__(self, *,
-                 net: Literal['testnet', 'mainnet'] = 'testnet',
+                 network: Literal['testnet', 'mainnet'] | Network = 'testnet',
                  api_key: str | None = None):
+        if network == 'testnet':
+            network = Network.testnet
+        elif network == 'mainnet':
+            network = Network.mainnet
+        Provider.__init__(self, network)
         host: str
-        if net == 'mainnet':
+        if network == Network.mainnet:
             host = 'https://toncenter.com/api/v3/'
-        elif net == 'testnet':
+        elif network == Network.testnet:
             host = 'https://testnet.toncenter.com/api/v3/'
         else:
             raise ToncenterError(f"Network should be 'mainnet' or 'testnet', but got {net}")
