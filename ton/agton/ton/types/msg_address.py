@@ -101,6 +101,10 @@ class AddrStd(TlbConstructor):
     address: bytes
     anycast: Anycast | None = None
 
+    def __post_init__(self):
+        if len(self.address) != 32:
+            raise ValueError("address hashpart must be exactly 32 bytes")
+
     @classmethod
     def tag(cls) -> tuple[int, int]:
         return 0b10, 2
