@@ -52,11 +52,3 @@ class Contract:
             body=body,
             init=init
         )
-    
-    @staticmethod
-    def state_init_to_address(state_init: StateInit, wc: int = 0) -> Address:
-        return Address(wc, state_init.to_cell().hash())
-    
-    @staticmethod
-    def code_and_data_to_address(code: Cell, data: Cell, wc: int = 0) -> Address:
-        return Contract.state_init_to_address(StateInit(code=code, data=data), wc)

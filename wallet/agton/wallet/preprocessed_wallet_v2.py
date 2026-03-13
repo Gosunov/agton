@@ -149,7 +149,10 @@ class PreprocessedWalletV2(Contract):
                          provider: Provider | None = None) -> PreprocessedWalletV2:
         public_key = private_key_to_public_key(private_key)
         data = PreprocessedWalletData.initial(public_key)
-        address = cls.code_and_data_to_address(PREPROCESSED_WALLET_V2_CODE, data.to_cell(), wc)
+        address = Address.from_state_init(StateInit(
+            code=PREPROCESSED_WALLET_V2_CODE, 
+            data=data.to_cell()
+        ), wc)
         return cls(address, private_key, provider)
 
     @classmethod

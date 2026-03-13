@@ -60,12 +60,10 @@ class WalletV4R2Data(TlbConstructor):
 
 class WalletV4R2(Contract):
     def __init__(self,
+                 provider: Provider,
                  address: Address,
                  private_key: bytes,
-                 subwallet: int | None = None,
-                 provider: Provider | None = None) -> None:
-        if subwallet is None:
-            subwallet = WALLET_V4R2_SUBWALLET_MAGIC + address.workchain
+                 subwallet: int) -> None:
         self.subwallet = subwallet
         self.private_key = private_key
         super().__init__(address, provider)
@@ -166,30 +164,33 @@ class WalletV4R2(Contract):
 
     @classmethod
     def from_private_key(cls,
+                         provider: Provider,
                          private_key: bytes,
                          subwallet: int | None = None,
-                         wc: int = 0,
-                         provider: Provider | None = None) -> WalletV4R2:
+                         wc: int = 0) -> WalletV4R2:
         if subwallet is None:
             subwallet = WALLET_V4R2_SUBWALLET_MAGIC + wc
         public_key = private_key_to_public_key(private_key)
         data = WalletV4R2Data.initial(public_key, subwallet)
-        address = cls.code_and_data_to_address(WALLET_V4R2_CODE, data.to_cell(), wc)
-        return cls(address, private_key, subwallet, provider)
+        address = Address.from_state_init(StateInit(
+            code=WALLET_V4R2_CODE, 
+            data=data.to_cell()
+        ), wc)
+        return cls(provider, address, private_key, subwallet)
 
     @classmethod
     def from_mnemonic(cls,
+                      provider: Provider,
                       mnemonic: str,
                       subwallet: int | None = None,
-                      wc: int = 0,
-                      provider: Provider | None = None) -> WalletV4R2:
+                      wc: int = 0) -> WalletV4R2:
         private_key = mnemonic_to_private_key(mnemonic)
-        return cls.from_private_key(private_key, subwallet, wc, provider)
+        return cls.from_private_key(provider, private_key, subwallet, wc)
 
     @classmethod
     def create(cls,
+               provider: Provider,
                subwallet: int | None = None,
-               wc: int = 0,
-               provider: Provider | None = None) -> tuple[WalletV4R2, str]:
+               wc: int = 0) -> tuple[WalletV4R2, str]:
         mnemonic = new_mnemonic()
-        return cls.from_mnemonic(mnemonic, subwallet, wc, provider), mnemonic
+        return cls.from_mnemonic(provider, mnemonic, subwallet, wc), mnemonic

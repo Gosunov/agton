@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from typing import Iterable
 
 from agton.ton import Contract, Cell, Message, MessageRelaxed, begin_cell, Provider, TlbConstructor
-from agton.ton import Builder
-from agton.ton import Slice, Address
+from agton.ton import StateInit, ActionSendMsg
+from agton.ton import Builder, Slice, Address
 from agton.ton.crypto.signing import private_key_to_public_key
 
 from agton.wallet.mnemonic import mnemonic_to_private_key, new_mnemonic
@@ -44,25 +44,25 @@ class WalletV1R3Data(TlbConstructor):
 
 class WalletV1R3(Contract):
     def __init__(self,
+                 provider: Provider,
                  address: Address,
-                 private_key: bytes,
-                 provider: Provider | None = None) -> None:
+                 private_key: bytes) -> None:
         self.private_key = private_key
         super().__init__(address, provider)
 
-    MessageWithMode = tuple[MessageRelaxed, int]
-
     def create_signed_external(self, 
-                               messages_with_modes: Iterable[MessageWithMode],
-                               seqno: int,
+                               actions: Iterable[ActionSendMsg],
+                               seqno: int | None = None,
                                use_dummy_private_key: bool = False) -> Message:
-        messages_with_modes = tuple(messages_with_modes)
-        if len(messages_with_modes) > 4:
+        if seqno is None:
+            seqno = self.seqno()
+        actions = tuple(actions)
+        if len(actions) > 4:
             raise ValueError('WalletV3R2 supports only up to 4 messages')
         packed_messages: Builder = Builder()
-        for message, mode in messages_with_modes:
-            packed_messages.store_uint(mode, 8)
-            packed_messages.store_ref(message.to_cell())
+        for action in actions:
+            packed_messages.store_uint(action.mode, 8)
+            packed_messages.store_ref(action.out_msg.to_cell())
 
         unsigned_body = (
             begin_cell()
@@ -86,24 +86,22 @@ class WalletV1R3(Contract):
                 'use alow_dangerous=True if you know what you doing, and want to suppress this error'
             )
 
+    def execute(self,
+                actions: Iterable[ActionSendMsg],
+                seqno: int | None = None,
+                *,
+                allow_dangerous: bool = False) -> bytes:
+        for action in actions:
+            self._safety_check(action.mode, allow_dangerous)
+        signed_message = self.create_signed_external(actions, seqno)
+        return self.send_external_message(signed_message)
+
     def send(self,
-             m: MessageRelaxed,
+             msg: MessageRelaxed,
              mode: int = 3,
              *, 
              allow_dangerous: bool = False) -> bytes:
-        self._safety_check(mode, allow_dangerous)
-        signed_message = self.create_signed_external([(m, mode)], self.seqno())
-        return self.send_external_message(signed_message)
-    
-    def send_many(self,
-                  messages_with_modes: Iterable[MessageWithMode],
-                  *,
-                  allow_dangerous: bool = False) -> bytes:
-        messages_with_modes = tuple(messages_with_modes)
-        for _, mode in messages_with_modes:
-            self._safety_check(mode, allow_dangerous)
-        signed_message = self.create_signed_external(messages_with_modes, self.seqno())
-        return self.send_external_message(signed_message)
+        return self.execute([ActionSendMsg(msg, mode)], allow_dangerous=allow_dangerous)
 
     def seqno(self) -> int:
         s = self.run_get_method('seqno')
@@ -113,25 +111,28 @@ class WalletV1R3(Contract):
 
     @classmethod
     def from_private_key(cls,
+                         provider: Provider,
                          private_key: bytes,
-                         wc: int = 0,
-                         provider: Provider | None = None) -> WalletV1R3:
+                         wc: int = 0) -> WalletV1R3:
         public_key = private_key_to_public_key(private_key)
         data = WalletV1R3Data.initial(public_key)
-        address = cls.code_and_data_to_address(WALLET_V1R3_CODE, data.to_cell(), wc)
-        return cls(address, private_key, provider)
+        address = Address.from_state_init(StateInit(
+            code=WALLET_V1R3_CODE, 
+            data=data.to_cell()
+        ), wc)
+        return cls(provider, address, private_key)
 
     @classmethod
     def from_mnemonic(cls,
+                      provider: Provider,
                       mnemonic: str,
-                      wc: int = 0,
-                      provider: Provider | None = None) -> WalletV1R3:
+                      wc: int = 0) -> WalletV1R3:
         private_key = mnemonic_to_private_key(mnemonic)
-        return cls.from_private_key(private_key, wc, provider)
+        return cls.from_private_key(provider, private_key, wc)
 
     @classmethod
     def create(cls,
-               wc: int = 0,
-               provider: Provider | None = None) -> tuple[WalletV1R3, str]:
+               provider: Provider,
+               wc: int = 0) -> tuple[WalletV1R3, str]:
         mnemonic = new_mnemonic()
-        return cls.from_mnemonic(mnemonic, wc, provider), mnemonic
+        return cls.from_mnemonic(provider, mnemonic, wc), mnemonic

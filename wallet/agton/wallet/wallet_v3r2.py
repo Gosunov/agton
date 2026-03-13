@@ -52,25 +52,28 @@ class WalletV3R2Data(TlbConstructor):
 
 class WalletV3R2(Contract):
     def __init__(self,
+                 provider: Provider,
                  address: Address,
                  private_key: bytes,
-                 subwallet: int | None = None,
-                 provider: Provider | None = None) -> None:
-        if subwallet is None:
-            subwallet = WALLET_V3R2_SUBWALLET_MAGIC + address.workchain
+                 subwallet: int) -> None:
         self.subwallet = subwallet
         self.private_key = private_key
         super().__init__(address, provider)
 
     def create_signed_external(self, 
                                actions: Iterable[ActionSendMsg],
-                               valid_until: int,
-                               seqno: int,
+                               seqno: int | None = None,
+                               valid_until: int | None = None,
                                use_dummy_private_key: bool = False,
                                include_state_init: bool = False) -> Message:
         actions = tuple(actions)
         if len(actions) > 4:
             raise ValueError('WalletV3R2 supports only up to 4 messages')
+        if valid_until is None:
+            t = datetime.now() + timedelta(minutes=3)
+            valid_until = int(t.timestamp())
+        if seqno is None:
+            seqno = self.seqno()
         packed_messages: Builder = Builder()
         for action in actions:
             packed_messages.store_uint(action.mode, 8)
@@ -101,27 +104,27 @@ class WalletV3R2(Contract):
     def _safety_check(self, mode: int, allow_dangerous: bool):
         if not (mode & 2) and not allow_dangerous:
             raise ValueError(
-                'Sending message without SendIgnoreErrors flag set can be dangerous'
+                'Sending message without SendIgnoreErrors flag set can be dangerous '
                 'use alow_dangerous=True if you know what you doing, and want to suppress this error'
             )
     
     def execute(self,
                 actions: Iterable[ActionSendMsg],
+                seqno: int | None = None,
                 valid_until: int | None = None,
                 *,
                 allow_dangerous: bool = False) -> bytes:
         for action in actions:
             self._safety_check(action.mode, allow_dangerous)
-        if valid_until is None:
-            t = datetime.now() + timedelta(minutes=3)
-            valid_until = int(t.timestamp())
-        signed_message = self.create_signed_external(actions, valid_until, self.seqno())
+        signed_message = self.create_signed_external(actions, seqno, valid_until)
         return self.send_external_message(signed_message)
     
     def deploy_via_external(self) -> bytes:
-        t = datetime.now() + timedelta(minutes=3)
-        valid_until = int(t.timestamp())
-        signed_message = self.create_signed_external([], valid_until, 0, include_state_init=True)
+        signed_message = self.create_signed_external((),
+            seqno=0,
+            valid_until=(1 << 32) - 1, 
+            include_state_init=True
+        )
         return self.send_external_message(signed_message)
 
     def send(self,
@@ -131,23 +134,6 @@ class WalletV3R2(Contract):
              *, 
              allow_dangerous: bool = False) -> bytes:
         return self.execute([ActionSendMsg(msg, mode)], valid_until, allow_dangerous=allow_dangerous)
-    
-    def send_many(self,
-                  msgs: Iterable[MessageRelaxed],
-                  modes: Iterable[int] | int = 3,
-                  valid_until: int | None = None,
-                  *, 
-                  allow_dangerous: bool = False) -> bytes:
-        if isinstance(modes, int):
-            modes = repeat(modes)
-            strict = False
-        else:
-            strict = True
-        actions = tuple(
-            ActionSendMsg(msg, mode)
-            for msg, mode in zip(msgs, modes, strict=strict)
-        )
-        return self.execute(actions, valid_until, allow_dangerous=allow_dangerous)
 
     def seqno(self) -> int:
         s = self.run_get_method('seqno')
@@ -157,30 +143,33 @@ class WalletV3R2(Contract):
 
     @classmethod
     def from_private_key(cls,
+                         provider: Provider,
                          private_key: bytes,
                          subwallet: int | None = None,
-                         wc: int = 0,
-                         provider: Provider | None = None) -> WalletV3R2:
+                         wc: int = 0) -> WalletV3R2:
         if subwallet is None:
             subwallet = WALLET_V3R2_SUBWALLET_MAGIC + wc
         public_key = private_key_to_public_key(private_key)
         data = WalletV3R2Data.initial(public_key, subwallet)
-        address = cls.code_and_data_to_address(WALLET_V3R2_CODE, data.to_cell(), wc)
-        return cls(address, private_key, subwallet, provider)
+        address = Address.from_state_init(StateInit(
+            code=WALLET_V3R2_CODE, 
+            data=data.to_cell()
+        ), wc)
+        return cls(provider, address, private_key, subwallet)
 
     @classmethod
     def from_mnemonic(cls,
+                      provider: Provider,
                       mnemonic: str,
                       subwallet: int | None = None,
-                      wc: int = 0,
-                      provider: Provider | None = None) -> WalletV3R2:
+                      wc: int = 0) -> WalletV3R2:
         private_key = mnemonic_to_private_key(mnemonic)
-        return cls.from_private_key(private_key, subwallet, wc, provider)
+        return cls.from_private_key(provider, private_key, subwallet, wc)
 
     @classmethod
     def create(cls,
+               provider: Provider,
                subwallet: int | None = None,
-               wc: int = 0,
-               provider: Provider | None = None) -> tuple[WalletV3R2, str]:
+               wc: int = 0) -> tuple[WalletV3R2, str]:
         mnemonic = new_mnemonic()
-        return cls.from_mnemonic(mnemonic, subwallet, wc, provider), mnemonic
+        return cls.from_mnemonic(provider, mnemonic, subwallet, wc), mnemonic
