@@ -65,7 +65,7 @@ class TonApiClient(Provider, BaseApiClient):
         else:
             raise ValueError(f"Network should be 'mainnet' or 'testnet', but got {net}")
 
-        BaseApiClient.__init__(self, host, api_key=('X-Api-Key', api_key) if api_key else None, rps=rps)
+        BaseApiClient.__init__(self, host, bearer_token=api_key if api_key else None, rps=rps)
 
 
     def run_get_method(self, address: Address, method: str, args: Iterable[TvmValue] = ()) -> tuple[TvmValue, ...]:
