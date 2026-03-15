@@ -57,9 +57,10 @@ class Message(TlbConstructor):
         else:
             b.store_bit(1)
             init = self.init.to_cell()
-            can_inline_init = len(init.data) <= b.remaining_bits - 2
-            can_inline_init &= len(init.refs) <= b.remaining_refs - 1
-            can_inline_init &= not init.special
+            # can_inline_init = len(init.data) <= b.remaining_bits - 2
+            # can_inline_init &= len(init.refs) <= b.remaining_refs - 1
+            # can_inline_init &= not init.special
+            can_inline_init = False
             if can_inline_init:
                 b.store_bit(0)
                 b.store_cell(init)
@@ -68,9 +69,10 @@ class Message(TlbConstructor):
                 b.store_ref(init)
 
         body = self.body
-        can_inline_body = len(body.data) <= b.remaining_bits - 1
-        can_inline_body &= len(body.refs) <= b.remaining_refs
-        can_inline_body &= not body.special
+        # can_inline_body = len(body.data) <= b.remaining_bits - 1
+        # can_inline_body &= len(body.refs) <= b.remaining_refs
+        # can_inline_body &= not body.special
+        can_inline_body = body == Cell.empty()
         if can_inline_body:
             b.store_bit(0)
             b.store_cell(body)
