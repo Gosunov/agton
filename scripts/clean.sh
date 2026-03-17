@@ -1,5 +1,5 @@
 set -euo pipefail
-projects=(ton jetton wallet dedust)
+projects=(ton jetton wallet dedust nft)
 for p in "${projects[@]}"; do
   rm -rf "$p/dist" 
   rm -rf "$p/build"
