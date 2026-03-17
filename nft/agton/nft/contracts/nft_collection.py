@@ -27,7 +27,7 @@ class NftCollection(Contract):
             case _:
                 raise TypeError(f"Unexpected result for get_collection_data: {s!r}")
     
-    def get_nft_address_by_index(self, index: int) -> Address:
+    def get_nft_address(self, index: int) -> Address:
         s = self.run_get_method('get_nft_address_by_index', [index])
         match s:
             case (Slice() as cs,):
@@ -37,8 +37,8 @@ class NftCollection(Contract):
             case _:
                 raise TypeError(f"Unexpected result for get_nft_address_by_index: {s!r}")
     
-    def get_nft_by_index(self, index: int) -> NftItem:
-        nft_address = self.get_nft_address_by_index(index)
+    def get_nft(self, index: int) -> NftItem:
+        nft_address = self.get_nft_address(index)
         return NftItem(nft_address, self.provider)
 
     def get_all_nfts(self) -> Iterator[NftItem]:
@@ -46,4 +46,4 @@ class NftCollection(Contract):
         if n == -1:
             raise ValueError('collection is not iterable, next_item_index is -1')
         for i in range(n):
-            yield self.get_nft_by_index(i)
+            yield self.get_nft(i)
